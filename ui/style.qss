@@ -39,13 +39,16 @@ QLabel#eyebrow { color: #9aadd1; font-size: 9pt; font-weight: 600; padding-left:
 QLabel#folderPath { color: #96a6bd; font-size: 9.5pt; padding-left: 2px; }
 QLabel#panelTitle { background: transparent; color: #dfe7f5; font-size: 10.5pt; font-weight: 600; }
 QLabel#panelSubtitle { color: #8f9fb9; font-size: 9.5pt; }
+QLabel#paperDate, QPushButton#exportAnswers {
+    font-size: 9pt;
+    font-weight: 400;
+}
 QLabel#paperDate {
     background: #223044;
     color: #bbcee9;
     border: 1px solid #3a4c68;
     border-radius: 6px;
     padding: 3px 8px;
-    font-size: 9pt;
 }
 QLabel#countBadge {
     background: #263149;
@@ -104,8 +107,6 @@ QPushButton#exportAnswers {
     border: 1px solid #496181;
     border-radius: 5px;
     padding: 0 10px;
-    font-size: 9pt;
-    font-weight: 500;
 }
 QPushButton#exportAnswers:hover { background: #30496b; border-color: #7698c5; color: #eef4ff; }
 QPushButton#exportAnswers:pressed { background: #1b2c44; border-color: #6081aa; }

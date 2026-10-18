@@ -92,7 +92,14 @@ class QuestionTreeModel(QStandardItemModel):
             # Group by the entire source directory, never by a reused ID.
             groups.setdefault(folder, []).append(question)
         modified = folder_modified or {}
-        self.assignments = tuple(Assignment(folder, tuple(items), modified.get(folder)) for folder, items in groups.items())
+        assignments = (Assignment(folder, tuple(items), modified.get(folder))
+                       for folder, items in groups.items())
+        self.assignments = tuple(sorted(
+            assignments,
+            key=lambda assignment: (assignment.modified is not None,
+                                    assignment.modified or datetime.min),
+            reverse=True,
+        ))
         for assignment in self.assignments:
             parent = QStandardItem(f"{assignment.label}\n{assignment.summary}\n{assignment.date_label}")
             parent.setEditable(False)
@@ -327,12 +334,15 @@ class MainWindow(QMainWindow):
         detail_header_layout.setSpacing(5)
         detail_title = QLabel("Answers")
         detail_title.setObjectName("panelTitle")
+        detail_title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         detail_heading = QHBoxLayout()
         detail_heading.setSpacing(12)
         detail_heading.addWidget(detail_title)
         detail_heading.addStretch()
         self.paper_date_label = QLabel()
         self.paper_date_label.setObjectName("paperDate")
+        self.paper_date_label.setFixedHeight(28)
+        self.paper_date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.paper_date_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.paper_date_label.hide()
         detail_heading.addWidget(self.paper_date_label)
@@ -341,9 +351,6 @@ class MainWindow(QMainWindow):
         self.source_label.setObjectName("sourcePath")
         self.source_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.source_label.setTextFormat(Qt.TextFormat.PlainText)
-        source_row = QHBoxLayout()
-        source_row.setSpacing(12)
-        source_row.addWidget(self.source_label, 1)
         self.export_button = QPushButton("Export answers")
         self.export_button.setObjectName("exportAnswers")
         self.export_button.setFixedHeight(28)
@@ -351,8 +358,8 @@ class MainWindow(QMainWindow):
         self.export_button.setToolTip("Export this entire paper with the first stored answer for each question")
         self.export_button.clicked.connect(self._export_answers)
         self.export_button.hide()
-        source_row.addWidget(self.export_button)
-        detail_header_layout.addLayout(source_row)
+        detail_heading.addWidget(self.export_button)
+        detail_header_layout.addWidget(self.source_label)
         right_layout.addWidget(detail_header)
         self.browser = LocalTextBrowser()
         self.browser.setAccessibleName("Question and stored answers")
@@ -368,7 +375,7 @@ class MainWindow(QMainWindow):
 
         self.status_label = QLabel("0 questions loaded")
         self.status_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.statusBar().setSizeGripEnabled(True)
+        self.statusBar().setSizeGripEnabled(False)
         self.statusBar().addWidget(self.status_label, 1)
         self.report_button = QPushButton()
         self.report_button.setObjectName("scanNotes")

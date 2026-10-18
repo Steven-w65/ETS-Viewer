@@ -7,13 +7,24 @@ import re
 from urllib.parse import urlsplit
 
 from PySide6.QtCore import Qt, QUrl, Slot
-from PySide6.QtGui import QImage, QImageReader, QTextCursor, QTextDocument
+from PySide6.QtGui import (QColor, QImage, QImageReader, QPainter, QPen,
+                          QTextCursor, QTextDocument, QTextOption, QTextTable)
 from PySide6.QtWidgets import QPushButton, QTextBrowser
 
 from core.parser import Question, plain_text
 
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+_CARD_RADIUS = 10
+_CARD_PADDING = 12
+_CARD_STYLES = {
+    "question": ("#202a3a", "#c1d0ef", "#35445b"),
+    "context": ("#1a2c42", "#9bbff0", "#334c66"),
+    "answer": ("#18382f", "#9ae2c4", "#3e6252"),
+    "explanation": ("#332c22", "#e8c492", "#64503a"),
+    "option": ("#202a3a", "#d3ddec", "#35445b"),
+    "correct-option": ("#204136", "#96e8cb", "#4b735e"),
+}
 
 
 def local_image(reference: str, source: Path, root: Path) -> Path | None:
@@ -133,16 +144,11 @@ a { color: #a9c7ff; text-decoration: none; font-weight: 600; }
 
 
 def _block(label: str, body: str, tone="question") -> str:
-    background, accent = {
-        "question": ("#202a3a", "#c1d0ef"),
-        "context": ("#1a2c42", "#9bbff0"),
-        "answer": ("#18382f", "#9ae2c4"),
-        "explanation": ("#332c22", "#e8c492"),
-    }[tone]
+    _, accent, _ = _CARD_STYLES[tone]
     heading = (f'<p class="section-label"><font color="{accent}">{escape(label)}</font></p>'
                if label else "")
-    return (f'<table width="100%" cellspacing="0" cellpadding="12"><tr>'
-            f'<td bgcolor="{background}">{heading}{body}</td>'
+    return (f'<table width="100%" cellspacing="0" cellpadding="{_CARD_PADDING}"><tr>'
+            f'<td><a name="ets-card:{tone}"></a>{heading}{body}</td>'
             '</tr></table><p class="spacer">&nbsp;</p>')
 
 
@@ -170,13 +176,15 @@ def render_question(question: Question, root: Path, image_width=640, expanded_an
         html.append(_block("Instructions", fragment(question.instructions)))
     if question.context:
         html.append(_block("Context", fragment(question.context), "context"))
-    html.append(images(question.images))
+    if question.images:
+        html.append(_block("", images(question.images)))
     for index, part in enumerate(question.parts):
         if len(question.parts) > 1:
             html.append(f"<h2>Question {escape(part.number or str(index + 1))}</h2>")
         if part.prompt:
             html.append(_block("", fragment(part.prompt)))
-        html.append(images(part.images))
+        if part.images:
+            html.append(_block("", images(part.images)))
         if part.context:
             # Passage questions store the actual question in xt_value when
             # xt_nr is only a template marker; do not label it as a dialogue.
@@ -185,16 +193,16 @@ def render_question(question: Question, root: Path, image_width=640, expanded_an
         if part.translation:
             html.append(_block("Translation", fragment(part.translation), "context"))
         if part.options:
-            html.append("<h3>Options</h3><table width='100%' cellspacing='3' cellpadding='8'>")
+            html.append("<h3>Options</h3>")
             labels = {plain_text(a.text).casefold() for a in part.answers}
             for option in part.options:
                 correct = option.label.casefold() in labels
-                background = "#204136" if correct else "#202a3a"
-                color = "#96e8cb" if correct else "#d3ddec"
-                html.append(f'<tr><td width="24" bgcolor="{background}"><font color="{color}">'
+                tone = "correct-option" if correct else "option"
+                _, color, _ = _CARD_STYLES[tone]
+                html.append(f'<table width="100%" cellspacing="0" cellpadding="{_CARD_PADDING}"><tr>'
+                            f'<td width="24"><a name="ets-card:{tone}"></a><font color="{color}">'
                             f'<b>{escape(option.label)}</b></font></td>'
-                            f'<td bgcolor="{background}">{fragment(option.text)}</td></tr>')
-            html.append('</table><p class="spacer">&nbsp;</p>')
+                            f'<td>{fragment(option.text)}</td></tr></table><p class="spacer">&nbsp;</p>')
         if not part.answers:
             html.append(_block("", '<p class="missing">Answer not found</p>', "explanation"))
         elif part.options:
@@ -236,11 +244,66 @@ class LocalTextBrowser(QTextBrowser):
         self._expanded_answers = set()
         self._answer_buttons: dict[str, QPushButton] = {}
         self._answer_positions: dict[str, int] = {}
+        self._card_tables = []
         self.setOpenLinks(False)
         self.setOpenExternalLinks(False)
         self.document().setDocumentMargin(24)
+        self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
         self.anchorClicked.connect(self._toggle_answers)
         self.verticalScrollBar().valueChanged.connect(self._position_answer_buttons)
+
+    def setHtml(self, text):
+        self._card_tables.clear()
+        super().setHtml(text)
+        # Tag only generated tables; original source tables keep their layout.
+        for table in self.document().rootFrame().childFrames():
+            if not isinstance(table, QTextTable):
+                continue
+            block = table.firstCursorPosition().block()
+            tone = None
+            while block.isValid() and block.position() <= table.lastPosition():
+                iterator = block.begin()
+                while not iterator.atEnd():
+                    for name in iterator.fragment().charFormat().anchorNames():
+                        if name.startswith("ets-card:") and name[9:] in _CARD_STYLES:
+                            tone = name[9:]
+                            break
+                    if tone:
+                        break
+                    iterator += 1
+                if tone:
+                    break
+                block = block.next()
+            # Qt drops empty anchors before image-only cells. Source table
+            # attributes are stripped, so this shape and padding identify the
+            # generated image wrapper without inserting hidden text.
+            if (tone is None and table.rows() == 1 and table.columns() == 1
+                    and table.format().cellPadding() == _CARD_PADDING):
+                tone = "question"
+            if tone:
+                table.setProperty("cardTone", tone)
+                self._card_tables.append(table)
+
+    def _card_bounds(self, table):
+        bounds = self.document().documentLayout().frameBoundingRect(table)
+        # Qt reports the first cell's padded origin with the table's outer
+        # size. Undo that offset so the background encloses all four insets.
+        padding = table.format().cellPadding()
+        return bounds.translated(-padding, -padding)
+
+    def paintEvent(self, event):
+        painter = QPainter(self.viewport())
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setClipRect(event.rect())
+        painter.translate(-self.horizontalScrollBar().value(), -self.verticalScrollBar().value())
+        for table in self._card_tables:
+            bounds = self._card_bounds(table)
+            background, _, border = _CARD_STYLES[table.property("cardTone")]
+            painter.setBrush(QColor(background))
+            painter.setPen(QPen(QColor(border), 1))
+            painter.drawRoundedRect(bounds.adjusted(0.5, 0.5, -0.5, -0.5), _CARD_RADIUS, _CARD_RADIUS)
+        painter.end()
+        super().paintEvent(event)
 
     def clear_question(self):
         self._question = None
@@ -253,6 +316,11 @@ class LocalTextBrowser(QTextBrowser):
         self._answer_positions.clear()
 
     def show_question(self, question: Question, root: Path, image_width=640):
+        available = self.viewport().width() - 2 * self.document().documentMargin() - 2 * _CARD_PADDING
+        if not self.verticalScrollBar().isVisible():
+            # Reserve room before a tall image makes the scrollbar appear.
+            available -= self.verticalScrollBar().sizeHint().width()
+        image_width = min(image_width, max(100, int(available)))
         changed = self._question is not question or self.root != root
         rescale_images = self._has_images and self._image_width != image_width
         if changed:
