@@ -7,8 +7,8 @@ import re
 from urllib.parse import urlsplit
 
 from PySide6.QtCore import Qt, QUrl, Slot
-from PySide6.QtGui import (QColor, QImage, QImageReader, QPainter, QPen,
-                          QTextCursor, QTextDocument, QTextOption, QTextTable)
+from PySide6.QtGui import (QColor, QFont, QFontMetricsF, QImage, QImageReader, QPainter, QPen,
+                          QTextBlockFormat, QTextCursor, QTextDocument, QTextOption, QTextTable)
 from PySide6.QtWidgets import QPushButton, QTextBrowser
 
 from core.parser import Question, plain_text
@@ -17,6 +17,10 @@ from core.parser import Question, plain_text
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 _CARD_RADIUS = 10
 _CARD_PADDING = 12
+_BODY_POINT_SIZE = 10.5
+_BODY_LINE_SPACING = 145
+_READING_COLUMNS = 72
+_ANSWER_CONTROL_HEIGHT = 24
 _CARD_STYLES = {
     "question": ("#202a3a", "#c1d0ef", "#35445b"),
     "context": ("#1a2c42", "#9bbff0", "#334c66"),
@@ -130,7 +134,7 @@ body { color: #e3e9f3; font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif
 h1 { color: #f3f6fc; font-size: 13pt; font-weight: 600; margin-top: 0; margin-bottom: 16px; }
 h2 { color: #c3d2f5; font-size: 11pt; margin-top: 16px; margin-bottom: 8px; }
 h3 { color: #a8b9d2; font-size: 10pt; font-weight: 600; margin-top: 10px; margin-bottom: 6px; }
-p { line-height: 135%; margin-top: 0; margin-bottom: 6px; }
+p { margin-top: 0; margin-bottom: 6px; }
 .muted { color: #97a7be; font-size: 9.5pt; }
 .section-label { font-size: 9.5pt; font-weight: 600; margin-bottom: 8px; }
 .variant { margin-top: 10px; }
@@ -215,11 +219,15 @@ def render_question(question: Question, root: Path, image_width=640, expanded_an
             expanded = index in expanded_answers
             body = [answer_text(part.answers[0])]
             if count > 1:
-                label = "Show fewer answers" if expanded else f"Show all {count} answers"
+                remaining = count - 1
+                label = ("Show fewer answers" if expanded else
+                         f"Show {remaining} more {'answer' if remaining == 1 else 'answers'}")
                 body.append(f'<p class="toggle"><a href="ets-answer:{index}">{label}</a></p>')
             if expanded:
                 for number, answer in enumerate(part.answers[1:], start=2):
                     body.append(f'<div class="variant"><span class="variant-label">{number}.</span> {answer_text(answer)}</div>')
+                if count > 1:
+                    body.append(f'<p class="toggle"><a href="ets-answer:{index}#bottom">Show fewer answers</a></p>')
             label = "Answers" if expanded else "Answer"
             html.append(_block(label, "".join(body), "answer"))
         if part.explanation:
@@ -255,6 +263,7 @@ class LocalTextBrowser(QTextBrowser):
     def setHtml(self, text):
         self._card_tables.clear()
         super().setHtml(text)
+        self._format_body_blocks()
         # Tag only generated tables; original source tables keep their layout.
         for table in self.document().rootFrame().childFrames():
             if not isinstance(table, QTextTable):
@@ -283,6 +292,55 @@ class LocalTextBrowser(QTextBrowser):
             if tone:
                 table.setProperty("cardTone", tone)
                 self._card_tables.append(table)
+
+    def _format_body_blocks(self):
+        """Normalize body text, including plain cells and source div blocks."""
+        cursor = QTextCursor(self.document())
+        cursor.beginEditBlock()
+        block = self.document().begin()
+        while block.isValid():
+            if block.text().strip() and not block.blockFormat().headingLevel():
+                body, control, image = False, False, False
+                iterator = block.begin()
+                while not iterator.atEnd():
+                    char_format = iterator.fragment().charFormat()
+                    body |= char_format.fontPointSize() >= _BODY_POINT_SIZE
+                    control |= char_format.anchorHref().startswith("ets-answer:")
+                    image |= char_format.isImageFormat()
+                    iterator += 1
+                block_format = block.blockFormat()
+                if control:
+                    # Reserve the same height as the overlaid native button.
+                    block_format.setLineHeight(_ANSWER_CONTROL_HEIGHT,
+                                               QTextBlockFormat.LineHeightTypes.FixedHeight.value)
+                elif body and not image:
+                    block_format.setLineHeight(_BODY_LINE_SPACING,
+                                               QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
+                else:
+                    block = block.next()
+                    continue
+                cursor.setPosition(block.position())
+                cursor.setBlockFormat(block_format)
+            block = block.next()
+        cursor.endEditBlock()
+
+    def _update_reading_width(self):
+        # Real viewport gutters constrain Qt rich text without unsupported CSS
+        # or document edits during resizing. Images and controls share the column.
+        font = QFont(self.font())
+        font.setPointSizeF(_BODY_POINT_SIZE)
+        reading_width = (QFontMetricsF(font).horizontalAdvance("0") * _READING_COLUMNS
+                         + 2 * (_CARD_PADDING + self.document().documentMargin()))
+        available = self.width() - 2 * self.frameWidth()
+        if self.verticalScrollBar().isVisible():
+            available -= self.verticalScrollBar().width()
+        gutter = max(0, int((available - reading_width) / 2))
+        if self.viewportMargins().left() != gutter:
+            self.setViewportMargins(gutter, 0, gutter, 0)
+        # QTextEdit may still have the pre-gutter width cached during its
+        # resize event. Update layout immediately, without editing content.
+        if self.document().textWidth() != self.viewport().width():
+            self.document().setTextWidth(self.viewport().width())
 
     def _card_bounds(self, table):
         bounds = self.document().documentLayout().frameBoundingRect(table)
@@ -316,6 +374,7 @@ class LocalTextBrowser(QTextBrowser):
         self._answer_positions.clear()
 
     def show_question(self, question: Question, root: Path, image_width=640):
+        self._update_reading_width()
         available = self.viewport().width() - 2 * self.document().documentMargin() - 2 * _CARD_PADDING
         if not self.verticalScrollBar().isVisible():
             # Reserve room before a tall image makes the scrollbar appear.
@@ -359,8 +418,9 @@ class LocalTextBrowser(QTextBrowser):
                         button = QPushButton(self.viewport())
                         button.setObjectName("answerToggle")
                         button.setCursor(Qt.CursorShape.PointingHandCursor)
-                        button.setFixedHeight(24)
-                        button.setProperty("answerTarget", href)
+                        button.setFixedHeight(_ANSWER_CONTROL_HEIGHT)
+                        button.setProperty("answerControl", href)
+                        button.setProperty("answerTarget", f"ets-answer:{QUrl(href).path()}")
                         button.clicked.connect(self._answer_button_clicked)
                         self._answer_buttons[href] = button
                     expanded = int(QUrl(href).path()) in self._expanded_answers
@@ -372,6 +432,10 @@ class LocalTextBrowser(QTextBrowser):
             block = block.next()
         for href in self._answer_buttons.keys() - positions.keys():
             button = self._answer_buttons.pop(href)
+            if button.hasFocus():
+                replacement = self._answer_buttons.get(button.property("answerTarget"))
+                if replacement is not None:
+                    replacement.setFocus(Qt.FocusReason.OtherFocusReason)
             button.hide()
             button.deleteLater()
         self._answer_positions = positions
@@ -379,7 +443,7 @@ class LocalTextBrowser(QTextBrowser):
 
     @Slot()
     def _answer_button_clicked(self):
-        self._toggle_answers(QUrl(self.sender().property("answerTarget")))
+        self._toggle_answers(QUrl(self.sender().property("answerControl")))
 
     def _position_answer_buttons(self, *_):
         for href, position in self._answer_positions.items():
@@ -397,21 +461,36 @@ class LocalTextBrowser(QTextBrowser):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, "_answer_positions"):
+            self._update_reading_width()
             self._position_answer_buttons()
 
     @Slot(QUrl)
     def _toggle_answers(self, url):
         if (self._question is None or self.root is None or url.scheme() != "ets-answer"
-                or not url.path().isdigit() or url.hasQuery() or url.hasFragment()):
+                or not url.path().isdigit() or url.hasQuery()
+                or (url.hasFragment() and url.fragment() != "bottom")):
             return
         index = int(url.path())
         if not 0 <= index < len(self._question.parts) or len(self._question.parts[index].answers) < 2:
+            return
+        bottom = url.fragment() == "bottom"
+        if bottom and index not in self._expanded_answers:
             return
         if index in self._expanded_answers:
             self._expanded_answers.remove(index)
         else:
             self._expanded_answers.add(index)
         self._render()
+        if bottom:
+            # The bottom control disappears with the references. Return to this
+            # section's preview, retaining focus on its surviving top control.
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(self._answer_positions[f"ets-answer:{index}"])
+            table = cursor.currentTable()
+            if table is not None:
+                cursor = table.firstCursorPosition()
+            bar = self.verticalScrollBar()
+            bar.setValue(bar.value() + self.cursorRect(cursor).top() - 24)
 
     def loadResource(self, resource_type, url):
         if resource_type != QTextDocument.ResourceType.ImageResource or self.root is None or not url.isLocalFile():

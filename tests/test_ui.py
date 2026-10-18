@@ -1,6 +1,8 @@
 import json
 import os
+from dataclasses import replace
 from datetime import datetime
+from html import escape
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -8,11 +10,11 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QEventLoop, QPoint, QPointF, QTimer, Qt, QUrl
-from PySide6.QtGui import QMouseEvent, QTextDocument, QWheelEvent
+from PySide6.QtGui import QMouseEvent, QTextBlockFormat, QTextDocument, QWheelEvent
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QPushButton, QSplitter
 
-from core.parser import parse_document
+from core.parser import parse_document, plain_text
 from tests.bank import BANK, read_record, temporary_bank
 from ui.main_window import MainWindow
 from ui.renderer import LocalTextBrowser, local_image, render_question, safe_fragment
@@ -492,8 +494,99 @@ class UITests(unittest.TestCase):
         self.assertIn("What can I do the night before an exam to feel more relaxed?", text)
         self.assertNotIn("Who inspired you to choose Italy for your trip?", text)
         self.assertNotIn("Why does deep breathing help with stress?", text)
-        self.assertIn("Show all 52 answers", text)
-        self.assertIn("Show all 51 answers", text)
+        self.assertIn("Show 51 more answers", text)
+        self.assertIn("Show 50 more answers", text)
+
+    def test_body_spacing_is_consistent_for_plain_paragraph_div_and_table_text(self):
+        path, data = read_record("586944/content_632489/content.json")
+        question = parse_document(data, path)
+        prompt = plain_text(question.parts[0].prompt)
+        browser = LocalTextBrowser()
+        self.addCleanup(browser.close)
+        browser.resize(760, 600)
+        browser.show()
+        for markup in ("{}", "<p>{}</p>", "<div>{}</div>", "<table><tr><td>{}</td></tr></table>"):
+            with self.subTest(markup=markup):
+                part = replace(question.parts[0], prompt=markup.format(escape(prompt)))
+                browser.show_question(replace(question, parts=(part,)), BANK)
+                cursor = browser.document().find(prompt)
+                self.assertFalse(cursor.isNull())
+                self.assertEqual(cursor.blockFormat().lineHeightType(),
+                                 QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
+                self.assertAlmostEqual(cursor.blockFormat().lineHeight(), 145)
+                heading = browser.document().find(f"Question {question.id}")
+                self.assertEqual(heading.blockFormat().headingLevel(), 1)
+                self.assertNotEqual(heading.blockFormat().lineHeight(), 145)
+                control = browser.document().find("Show 51 more answers")
+                self.assertFalse(control.isNull())
+                self.assertNotEqual(control.blockFormat().lineHeight(), 145)
+
+    def test_reading_width_is_limited_on_wide_windows_and_fills_narrow_windows(self):
+        path, data = read_record("586944/content_632489/content.json")
+        browser = LocalTextBrowser()
+        self.addCleanup(browser.close)
+        browser.resize(1400, 600)
+        browser.show()
+        browser.show_question(parse_document(data, path), BANK)
+        self.app.processEvents()
+        self.assertLessEqual(browser.viewport().width(), 720)
+        self.assertGreater(browser.viewportMargins().left(), 200)
+        self.assertLessEqual(browser.document().size().width(), browser.viewport().width() + 1)
+        text = browser.toPlainText()
+        changes = QSignalSpy(browser.document().contentsChanged)
+        browser.resize(400, 600)
+        self.app.processEvents()
+        self.assertEqual(browser.viewportMargins().left(), 0)
+        self.assertGreater(browser.viewport().width(), 350)
+        self.assertLessEqual(browser.document().size().width(), browser.viewport().width() + 1)
+        self.assertEqual(browser.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(browser.toPlainText(), text)
+        self.assertEqual(changes.count(), 0, "Changing reading width must only reflow the document")
+
+    def test_one_remaining_reference_uses_a_singular_count(self):
+        path, data = read_record("586944/content_632489/content.json")
+        question = parse_document(data, path)
+        part = replace(question.parts[0], answers=question.parts[0].answers[:2])
+        browser = LocalTextBrowser()
+        self.addCleanup(browser.close)
+        browser.show_question(replace(question, parts=(part,)), BANK)
+        self.assertIn("Show 1 more answer", browser.toPlainText())
+        self.assertNotIn("Show 2", browser.toPlainText())
+
+    def test_bottom_collapse_returns_to_its_section_and_keeps_other_answers_expanded(self):
+        path, data = read_record("586944/content_632489/content.json")
+        question = parse_document(data, path)
+        browser = LocalTextBrowser()
+        self.addCleanup(browser.close)
+        browser.resize(760, 600)
+        browser.show()
+        browser.show_question(question, BANK)
+        browser.anchorClicked.emit(QUrl("ets-answer:1"))
+        browser.anchorClicked.emit(QUrl("ets-answer:0"))
+        self.app.processEvents()
+        controls = browser.viewport().findChildren(QPushButton, "answerToggle")
+        first_section = [button for button in controls if button.property("answerTarget") == "ets-answer:0"]
+        self.assertEqual(len(first_section), 2, "An expanded section needs top and bottom collapse controls")
+        top, bottom = sorted(first_section, key=lambda button: button.y())
+        self.assertNotEqual(top.property("answerControl"), bottom.property("answerControl"))
+        for part in question.parts:
+            for answer in part.answers:
+                self.assertIn(plain_text(answer.text), plain_text(browser.toPlainText()))
+        bar = browser.verticalScrollBar()
+        bar.setValue(bar.value() + bottom.y() - browser.viewport().height() + 60)
+        self.app.processEvents()
+        self.assertTrue(browser.viewport().rect().intersects(bottom.geometry()))
+        bottom.setFocus()
+        QTest.keyClick(bottom, Qt.Key.Key_Space)
+        self.app.processEvents()
+        self.assertEqual(top.accessibleName(), "Show 51 more answers")
+        self.assertTrue(top.hasFocus(), "Focus must return to the surviving control for the same section")
+        self.assertTrue(browser.viewport().rect().intersects(top.geometry()))
+        self.assertNotIn(plain_text(question.parts[0].answers[1].text), plain_text(browser.toPlainText()))
+        self.assertIn(plain_text(question.parts[0].answers[0].text), plain_text(browser.toPlainText()))
+        self.assertIn(plain_text(question.parts[1].answers[-1].text), plain_text(browser.toPlainText()))
+        self.assertEqual(sum(button.property("answerTarget") == "ets-answer:0"
+                             for button in browser._answer_buttons.values()), 1)
 
     def test_answer_controls_expand_independently_and_reset_on_question_change(self):
         path, data = read_record("586944/content_632489/content.json")
@@ -541,7 +634,7 @@ class UITests(unittest.TestCase):
         browser.resize(760, 600)
         browser.show()
         browser.show_question(parse_document(data, path), BANK)
-        cursor = browser.document().find("Show all 52 answers")
+        cursor = browser.document().find("Show 51 more answers")
         cursor.setPosition(cursor.selectionStart() + 2)
         browser.setTextCursor(cursor)
         browser.ensureCursorVisible()
@@ -567,7 +660,7 @@ class UITests(unittest.TestCase):
         self.app.processEvents()
         buttons = browser.viewport().findChildren(QPushButton, "answerToggle")
         self.assertEqual(len(buttons), 2)
-        button = next(button for button in buttons if button.accessibleName() == "Show all 52 answers")
+        button = next(button for button in buttons if button.accessibleName() == "Show 51 more answers")
         self.assertTrue(button.isVisible())
         QTest.mouseClick(button, Qt.MouseButton.LeftButton)
         self.app.processEvents()
@@ -577,7 +670,7 @@ class UITests(unittest.TestCase):
         button.setFocus()
         QTest.keyClick(button, Qt.Key.Key_Space)
         self.assertNotIn("Who inspired you to choose Italy for your trip?", browser.toPlainText())
-        self.assertEqual(button.accessibleName(), "Show all 52 answers")
+        self.assertEqual(button.accessibleName(), "Show 51 more answers")
         browser.clear_question()
         self.assertFalse(button.isVisible())
 

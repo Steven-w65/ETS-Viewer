@@ -67,7 +67,7 @@ Replace `path\to\ETS` with your bank's location. If `APPDATA` is unavailable, th
 
 1. **Open a paper.** Click **Select Folder**, then expand an assignment or exam in the left panel. Groups start collapsed; select a question to display its sub-questions and answers.
 2. **Find a question.** Type an ID or keywords in the search box. Search ignores case and matches all entered words. Matching groups expand automatically; clear the search to return to collapsed groups.
-3. **Read the references.** Use **Show all … answers** and **Show fewer answers** to expand or collapse stored responses. Resizing the panels preserves the expanded answers and reading position.
+3. **Read the references.** Use **Show N more answers** to reveal the remaining stored responses. **Show fewer answers** is available at both the top and bottom of an expanded section; the bottom control returns you to that section's first answer. Each sub-question expands independently. Resizing the panels preserves the expanded answers and reading position.
 4. **Export a paper.** Select a paper or one of its questions, click **Export answers**, and choose a `.txt` destination.
 
 **Export behavior:** the file includes the **entire selected paper**, including questions hidden by search, and **only the first stored answer per sub-question**. Questions without an answer retain `Answer not found`. Exports use UTF-8 with a BOM, save atomically, and protect original bank files from being overwritten.
