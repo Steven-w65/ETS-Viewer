@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QFont, QPalette
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from ui.main_window import MainWindow, default_bank_folder
@@ -20,16 +20,6 @@ def main() -> int:
     app.setApplicationName("ETS-Viewer")
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#10151e"))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor("#dce5f4"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#171e2a"))
-    palette.setColor(QPalette.ColorRole.Text, QColor("#dce5f4"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#263149"))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#dce5f4"))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor("#334f7c"))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#f3f6fc"))
-    app.setPalette(palette)
     window = MainWindow()
     window.show()
     folder = arguments.folder if arguments.folder is not None else default_bank_folder()

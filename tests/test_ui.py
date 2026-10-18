@@ -81,12 +81,10 @@ class UITests(unittest.TestCase):
 
             with patch.dict(os.environ, {'APPDATA': str(roaming)}), patch.object(QFileDialog, 'exec', choose_save):
                 QTest.mouseClick(window.export_button, Qt.MouseButton.LeftButton)
-            self.wait_for(lambda: any(b.isVisible() for b in window.findChildren(QMessageBox)))
-            box = next(b for b in window.findChildren(QMessageBox) if b.isVisible())
-            self.assertEqual(box.windowTitle(), 'Export complete')
-            self.assertEqual(box.icon(), QMessageBox.Icon.Information)
-            self.assertIn(str(output), box.informativeText())
-            box.accept()
+            self.assertTrue(window.toast.isVisible())
+            self.assertIn('Paper exported successfully', window.toast.text())
+            self.assertIn(str(output), window.toast.toolTip())
+            self.assertFalse(window.findChildren(QMessageBox))
             exported = output.read_text(encoding='utf-8-sig')
             self.assertEqual(exported.count('Question group: '), 12)
             self.assertEqual(exported.count('\nAnswer:\n'), 32)
@@ -95,7 +93,7 @@ class UITests(unittest.TestCase):
         self.assertEqual(window.question_tree.currentIndex(), selection)
         window.search.setText('no matching test 000000000')
         self.wait_for(lambda: not window._search_timer.isActive())
-        self.assertTrue(window.export_button.isHidden())
+        self.assertTrue(window.export_button.isVisible(), 'The complete selected paper remains exportable')
 
     def test_export_cancel_and_io_failure_leave_the_viewer_usable(self):
         window = MainWindow()
@@ -127,24 +125,10 @@ class UITests(unittest.TestCase):
         window.question_tree.setCurrentIndex(window.proxy.index(0, 0, window.proxy.index(0, 0)))
         self.assertIn('Why is the woman surprised?', window.browser.toPlainText())
 
-    def test_empty_or_unsupported_scan_warns_after_stopping_and_allows_a_new_folder(self):
+    def test_empty_or_unsupported_scan_shows_inline_state_after_stopping_and_allows_a_new_folder(self):
         window = MainWindow()
         self.addCleanup(window.close)
         window.show()
-        prompts = []
-
-        def acknowledge_warning():
-            for box in window.findChildren(QMessageBox):
-                if box.isVisible():
-                    prompts.append((box.windowTitle(), box.text(), box.informativeText(), box.icon(),
-                                    window._worker is None, window.progress.isHidden(),
-                                    window.proxy.rowCount(), box.isModal()))
-                    box.accept()
-
-        watcher = QTimer(window)
-        watcher.setInterval(10)
-        watcher.timeout.connect(acknowledge_warning)
-        watcher.start()
         with temporary_bank() as temporary:
             folder = Path(temporary)
             for unsupported in (False, True):
@@ -153,26 +137,29 @@ class UITests(unittest.TestCase):
                         (folder / "unsupported.dat").write_bytes(b"Unsupported bank format")
                     window.load_folder(folder)
                     self.wait_for(lambda: window._worker is None)
-                    acknowledge_warning()
-                    self.assertEqual(len(prompts), 2 if unsupported else 1)
-                    title, text, detail, icon, stopped, idle, count, modal = prompts[-1]
-                    self.assertEqual(title, "No exams found")
-                    self.assertIn("No supported ETS exams", text)
-                    self.assertIn(str(folder), detail)
-                    self.assertEqual(icon, QMessageBox.Icon.Warning)
-                    self.assertTrue(stopped)
-                    self.assertTrue(idle)
-                    self.assertTrue(modal)
-                    self.assertEqual(count, 0)
-                    self.assertIn("Scan stopped", window.status_label.text())
+                    self.assertEqual(window.empty_title.text(), "No Exams Found")
+                    self.assertIn("No supported ETS exams", window.empty_description.text())
+                    self.assertIn(str(folder), window.folder_label.toolTip())
+                    self.assertIsNone(window._worker)
+                    self.assertFalse(window._scanning)
+                    self.assertTrue(window.progress.isHidden())
+                    self.assertEqual(window.proxy.rowCount(), 0)
+                    self.assertIn("No supported papers", window.status_label.text())
+                    self.assertIs(window.workspace.currentWidget(), window.empty_page)
+                    self.assertTrue(window.empty_action.isVisible())
+                    self.assertEqual(window.empty_action.text(), "Change Bank")
+                    self.assertFalse(window.findChildren(QMessageBox))
+                    self.assertEqual(window.report_button.isVisible(), unsupported)
+                    if unsupported:
+                        self.assertTrue(any(issue.path == folder / "unsupported.dat" for issue in window._result.issues))
             window.load_folder(BANK / "586944")
             self.wait_for(lambda: window._worker is None)
             self.assertEqual(window.proxy.rowCount(window.proxy.index(0, 0)), 12)
             window.search.setText("no matching exam 000000000")
             self.wait_for(lambda: not window._search_timer.isActive())
             self.app.processEvents()
-            self.assertEqual(len(prompts), 2)
-        watcher.stop()
+            self.assertFalse(window.findChildren(QMessageBox))
+            self.assertIs(window.workspace.currentWidget(), window.overview_page)
 
     def test_replaced_or_closing_empty_scans_do_not_show_an_error_prompt(self):
         window = MainWindow()
@@ -205,23 +192,31 @@ class UITests(unittest.TestCase):
         self.assertGreater(len(ticks), 0)
         self.assertEqual(window.proxy.rowCount(), 1)
         self.assertEqual(window.proxy.rowCount(window.proxy.index(0, 0)), 12)
-        self.assertIn("32", window.status_label.text())
+        self.assertEqual(window.overview_totals, (1, 12, 32))
+        self.assertEqual([value.text() for value in window.stat_values], ["1", "12", "32"])
         window.search.setText("632481")
         self.wait_for(lambda: not window._search_timer.isActive())
         self.assertEqual(window.proxy.rowCount(), 1)
         self.assertEqual(window.proxy.rowCount(window.proxy.index(0, 0)), 1)
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
+        window.question_tree.setCurrentIndex(window.proxy.index(0, 0))
         self.assertIn("Why is the woman surprised?", window.browser.toPlainText())
         self.assertIn("C", window.browser.toPlainText())
         self.assertIn("The man has learned names quickly.", window.browser.toPlainText())
         window.search.setText("no such question id 000000000")
         self.wait_for(lambda: window.proxy.rowCount() == 0)
-        self.assertIn("No matching questions", window.browser.toPlainText())
+        self.assertIn("No matching questions", window.empty_title.text())
+        self.assertIs(window.workspace.currentWidget(), window.empty_page)
         window.search.clear()
         self.wait_for(lambda: window.proxy.rowCount() == 1)
         self.assertEqual(window.proxy.rowCount(window.proxy.index(0, 0)), 12)
-        self.assertIn("Select a paper", window.browser.toPlainText())
+        self.assertIn("Why is the woman surprised?", window.browser.toPlainText())
+        window._back_to_papers()
+        window.search.clear()
+        self.wait_for(lambda: not window._search_timer.isActive())
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
 
-    def test_assignments_are_collapsed_roots_with_their_own_question_children(self):
+    def test_papers_drill_down_to_their_own_question_children_with_keyboard_navigation(self):
         window = MainWindow()
         self.addCleanup(window.close)
         window.show()
@@ -246,11 +241,17 @@ class UITests(unittest.TestCase):
         self.assertEqual(set(seen_questions), {q.source for q in window._result.questions})
         self.assertEqual(len(seen_questions), len(window._result.questions))
         self.assertIsNotNone(assignment)
-        self.assertIn("Select a paper", window.browser.toPlainText())
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
         window.question_tree.setCurrentIndex(assignment)
-        QTest.keyClick(window.question_tree, Qt.Key.Key_Right)
-        self.assertTrue(window.question_tree.isExpanded(assignment))
+        self.assertEqual(window.question_tree.rootIndex(), assignment)
+        self.assertEqual(window.navigation_level, "questions")
+        self.assertFalse(window.question_tree.itemsExpandable())
         child = window.proxy.index(0, 0, assignment)
+        self.assertEqual(window.question_tree.currentIndex(), child)
+        QTest.keyClick(window.question_tree, Qt.Key.Key_Down)
+        self.assertEqual(window.question_tree.currentIndex(), window.proxy.index(1, 0, assignment))
+        QTest.keyClick(window.question_tree, Qt.Key.Key_Up)
+        self.assertEqual(window.question_tree.currentIndex(), child)
         window.question_tree.scrollTo(child)
         self.app.processEvents()
         QTest.mouseClick(window.question_tree.viewport(), Qt.MouseButton.LeftButton,
@@ -269,19 +270,24 @@ class UITests(unittest.TestCase):
         root = window.proxy.index(0, 0)
         self.assertIn("586944", root.data())
         self.assertEqual(window.proxy.rowCount(root), 12)
-        self.assertTrue(window.question_tree.isExpanded(root))
+        self.assertFalse(window.question_tree.rootIndex().isValid())
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
         window.search.setText("586944 ELEPHANTS")
         self.wait_for(lambda: not window._search_timer.isActive())
         self.assertEqual(window.proxy.rowCount(), 1)
         root = window.proxy.index(0, 0)
         self.assertEqual(window.proxy.rowCount(root), 1)
         self.assertEqual(window.proxy.index(0, 0, root).data(Qt.ItemDataRole.UserRole).id, "632484")
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
+        window.question_tree.setCurrentIndex(root)
         self.assertIn("Question 632484", window.browser.toPlainText())
+        self.assertEqual(window.search.text(), "586944 ELEPHANTS")
+        window._back_to_papers()
         window.search.clear()
         self.wait_for(lambda: not window._search_timer.isActive())
         for row in range(window.proxy.rowCount()):
             self.assertFalse(window.question_tree.isExpanded(window.proxy.index(row, 0)))
-        self.assertIn("Select a paper", window.browser.toPlainText())
+        self.assertIs(window.workspace.currentWidget(), window.overview_page)
 
     def test_selecting_one_question_folder_still_retains_its_assignment(self):
         window = MainWindow()
@@ -307,23 +313,24 @@ class UITests(unittest.TestCase):
         self.assertIn(f"{modified:%Y-%m-%d %H:%M:%S}", root.data(Qt.ItemDataRole.ToolTipRole))
         with patch("ui.main_window.Path.stat", side_effect=AssertionError("Date metadata must already be cached")):
             window.question_tree.setCurrentIndex(root)
-            self.assertEqual(window.paper_date_label.text(), f"Folder modified: {date}")
+            self.assertEqual(window.paper_date_label.text(), date)
+            self.assertIn(f"{modified:%Y-%m-%d %H:%M:%S}", window.paper_date_label.toolTip())
             self.assertFalse(window.paper_date_label.isHidden())
-            window.question_tree.expand(root)
             window.question_tree.setCurrentIndex(window.proxy.index(0, 0, root))
             window.question_tree.viewport().grab()
-            self.assertEqual(window.paper_date_label.text(), f"Folder modified: {date}")
+            self.assertEqual(window.paper_date_label.text(), date)
             self.assertIn("Why is the woman surprised?", window.browser.toPlainText())
+        window._back_to_papers()
         window.search.setText("no matching paper 000000000")
         self.wait_for(lambda: not window._search_timer.isActive())
-        self.assertTrue(window.paper_date_label.isHidden())
+        self.assertFalse(window.paper_date_label.isVisible())
 
     def test_picture_renders_actual_image_and_reading_marks_absent_answer(self):
         browser = LocalTextBrowser()
         browser.root = BANK
         path, data = read_record("586944/content_632490/content.json")
         question = parse_document(data, path)
-        html = render_question(question, BANK)
+        html = render_question(question, BANK, shared_expanded=True)
         browser.setHtml(html)
         self.assertIn("Shared umbrellas.", browser.toPlainText())
         self.assertIn("Answer", browser.toPlainText())
@@ -332,7 +339,7 @@ class UITests(unittest.TestCase):
                                      QUrl.fromLocalFile(str(path.parent / "material" / "content.jpg")))
         self.assertFalse(image.isNull())
         path, data = read_record("586944/content_632488/content.json")
-        browser.setHtml(render_question(parse_document(data, path), BANK))
+        browser.setHtml(render_question(parse_document(data, path), BANK, shared_expanded=True))
         self.assertIn("Earworms", browser.toPlainText())
         self.assertIn("Answer not found", browser.toPlainText())
 
@@ -341,6 +348,7 @@ class UITests(unittest.TestCase):
         self.addCleanup(window.close)
         window.show()
         self.app.processEvents()
+        self.wait_for(lambda: not window._resize_timer.isActive())
         splitter = window.findChild(QSplitter)
         left, right = splitter.widget(0), splitter.widget(1)
         gap = right.x() - left.x() - left.width()
@@ -348,6 +356,7 @@ class UITests(unittest.TestCase):
         self.assertLessEqual(gap, 10)
         splitter.setSizes([400, 600])
         self.app.processEvents()
+        self.wait_for(lambda: not window._resize_timer.isActive())
         self.assertEqual(right.x() - left.x() - left.width(), gap)
 
     def test_dragging_splitter_reflows_expanded_text_without_rebuilding_it(self):
@@ -358,6 +367,7 @@ class UITests(unittest.TestCase):
         self.wait_for(lambda: window._worker is None)
         window.search.setText('632489')
         self.wait_for(lambda: not window._search_timer.isActive() and not window._resize_timer.isActive())
+        window.question_tree.setCurrentIndex(window.proxy.index(0, 0))
         window.browser.anchorClicked.emit(QUrl('ets-answer:0'))
         window.browser.verticalScrollBar().setValue(200)
         selection = window.question_tree.currentIndex()
@@ -401,7 +411,9 @@ class UITests(unittest.TestCase):
         bar = browser.verticalScrollBar()
         point = QPoint(400, 300)
         for delta in (-120, 120):
-            for step in range(80):
+            # Taller cards and proportional text can require more than a fixed
+            # number of notches; retain the per-notch stability checks to each end.
+            for step in range(bar.maximum() // max(1, bar.singleStep()) + 2):
                 before = bar.value()
                 event = QWheelEvent(QPointF(point), QPointF(browser.viewport().mapToGlobal(point)),
                                     QPoint(), QPoint(0, delta), Qt.MouseButton.NoButton,
@@ -416,6 +428,8 @@ class UITests(unittest.TestCase):
                         self.assertGreaterEqual(after, before)
                     else:
                         self.assertLessEqual(after, before)
+                if after == (bar.maximum() if delta < 0 else 0):
+                    break
             self.assertEqual(bar.value(), bar.maximum() if delta < 0 else 0)
 
     def test_resizing_a_question_still_scales_its_original_local_image(self):
@@ -424,6 +438,8 @@ class UITests(unittest.TestCase):
         browser = LocalTextBrowser()
         self.addCleanup(browser.close)
         browser.show_question(question, BANK, image_width=640)
+        browser.anchorClicked.emit(QUrl('ets-shared:0'))
+        self.assertTrue(browser._shared_expanded)
         before = [fmt.toImageFormat().width() for fmt in browser.document().allFormats() if fmt.isImageFormat()]
         text = browser.toPlainText()
         browser.show_question(question, BANK, image_width=320)
@@ -433,8 +449,9 @@ class UITests(unittest.TestCase):
         self.assertLess(after[0], before[0])
         self.assertLessEqual(after[0], 320)
         self.assertEqual(browser.toPlainText(), text)
+        self.assertTrue(browser._shared_expanded)
 
-    def test_selected_tree_rows_have_one_continuous_highlight_across_the_indentation(self):
+    def test_question_rows_have_one_continuous_highlight_across_focus_changes(self):
         window = MainWindow()
         self.addCleanup(window.close)
         window.show()
@@ -442,9 +459,9 @@ class UITests(unittest.TestCase):
         self.wait_for(lambda: window._worker is None)
         tree = window.question_tree
         parent = window.proxy.index(0, 0)
-        tree.expand(parent)
-        child = window.proxy.index(0, 0, parent)
-        for index in (parent, child):
+        tree.setCurrentIndex(parent)
+        QTest.mouseMove(window.search)
+        for index in (window.proxy.index(0, 0, parent), window.proxy.index(1, 0, parent)):
             tree.clearSelection()
             self.app.processEvents()
             row = tree.visualRect(index)
@@ -476,14 +493,14 @@ class UITests(unittest.TestCase):
                                          "Selection fill must remain consistent when focus changes")
                     selected_background = background
 
-                    # Outer corners may curve; the internal branch/item
-                    # boundary must never introduce another rounded edge.
-                    for y in (row.top() + 4, row.bottom() - 8):
+                    # The flat question list has no branch indentation. Sample
+                    # the full safe interior to retain the continuous-fill check.
+                    for y in (row.top() + 7, row.bottom() - 9):
                         reference = color(row.left() + 16, y)
-                        for x in range(row.left() - 2, row.left() + 3):
+                        for x in range(row.left() + 12, row.right() - 12, 8):
                             actual = color(x, y)
                             self.assertLessEqual(max(abs(a - b) for a, b in zip(actual, reference)), 3,
-                                                 "Selection has a seam between the branch and item body")
+                                                 "Selection has a seam across the question row")
 
     def test_reference_answers_start_with_one_stored_response_per_part(self):
         path, data = read_record("586944/content_632489/content.json")
@@ -513,13 +530,13 @@ class UITests(unittest.TestCase):
                 self.assertFalse(cursor.isNull())
                 self.assertEqual(cursor.blockFormat().lineHeightType(),
                                  QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
-                self.assertAlmostEqual(cursor.blockFormat().lineHeight(), 145)
+                self.assertAlmostEqual(cursor.blockFormat().lineHeight(), 150)
                 heading = browser.document().find(f"Question {question.id}")
                 self.assertEqual(heading.blockFormat().headingLevel(), 1)
-                self.assertNotEqual(heading.blockFormat().lineHeight(), 145)
+                self.assertNotEqual(heading.blockFormat().lineHeight(), 150)
                 control = browser.document().find("Show 51 more answers")
                 self.assertFalse(control.isNull())
-                self.assertNotEqual(control.blockFormat().lineHeight(), 145)
+                self.assertNotEqual(control.blockFormat().lineHeight(), 150)
 
     def test_reading_width_is_limited_on_wide_windows_and_fills_narrow_windows(self):
         path, data = read_record("586944/content_632489/content.json")
@@ -529,7 +546,8 @@ class UITests(unittest.TestCase):
         browser.show()
         browser.show_question(parse_document(data, path), BANK)
         self.app.processEvents()
-        self.assertLessEqual(browser.viewport().width(), 720)
+        self.assertGreaterEqual(browser.viewport().width(), 800)
+        self.assertLessEqual(browser.viewport().width(), 820)
         self.assertGreater(browser.viewportMargins().left(), 200)
         self.assertLessEqual(browser.document().size().width(), browser.viewport().width() + 1)
         text = browser.toPlainText()
@@ -620,6 +638,7 @@ class UITests(unittest.TestCase):
         self.wait_for(lambda: window._worker is None)
         window.search.setText("632489")
         self.wait_for(lambda: not window._search_timer.isActive())
+        window.question_tree.setCurrentIndex(window.proxy.index(0, 0))
         window.browser.anchorClicked.emit(QUrl("ets-answer:0"))
         window.browser.verticalScrollBar().setValue(200)
         window.resize(window.width() + 60, window.height() + 20)
@@ -689,7 +708,7 @@ class UITests(unittest.TestCase):
         path, data = read_record("586944/content_632484/content.json")
         question = parse_document(data, path)
         browser = LocalTextBrowser()
-        browser.setHtml(render_question(question, BANK))
+        browser.setHtml(render_question(question, BANK, shared_expanded=True))
         text = browser.toPlainText()
         self.assertIn("14. What is the main idea of the passage?", text)
         self.assertNotIn("\nTranscript\n", text)

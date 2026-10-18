@@ -42,7 +42,7 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-**3. Choose your bank.** The app opens `%APPDATA%\ETS` automatically when that folder exists. Otherwise, click **Select Folder**.
+**3. Choose your bank.** The app opens `%APPDATA%\ETS` automatically when that folder exists. Otherwise, click **Select Question Bank**.
 
 To open a different folder directly:
 
@@ -56,23 +56,25 @@ Replace `path\to\ETS` with your bank's location. If `APPDATA` is unavailable, th
 
 | | What you get |
 | --- | --- |
-| **Organized browsing** | Assignments and exams stay grouped by their source folders, with question previews and folder modification dates. |
+| **Organized browsing** | A two-level sidebar lists papers newest first, then the selected paper's question groups with two-line previews. |
 | **Flexible search** | Find papers or questions by ID, keywords, original text, transcripts, options, answers, or source path. Supports Chinese and other Unicode text. |
-| **Comfortable reading** | A dark interface, resizable panels, keyboard navigation, local prompt images, and clear question and answer blocks. |
+| **Comfortable reading** | A centered reading column, sticky Qn navigation, secure inline images, and separate question and reference cards. |
+| **Adaptive appearance** | System, Light and Dark modes; a resizable sidebar with an icon rail on narrow windows. |
 | **Reference answers** | See the first stored response immediately; expand additional references for each sub-question independently. |
 | **Paper exports** | Save a complete paper's questions and first stored answers as a Windows-friendly UTF-8 text file. |
 | **Local operation** | Browse without accounts, servers, or network requests. Scanning and viewing leave the original bank files unchanged. |
 
 ## Everyday use
 
-1. **Open a paper.** Click **Select Folder**, then expand an assignment or exam in the left panel. Groups start collapsed; select a question to display its sub-questions and answers.
-2. **Find a question.** Type an ID or keywords in the search box. Search ignores case and matches all entered words. Matching groups expand automatically; clear the search to return to collapsed groups.
-3. **Read the references.** Use **Show N more answers** to reveal the remaining stored responses. **Show fewer answers** is available at both the top and bottom of an expanded section; the bottom control returns you to that section's first answer. Each sub-question expands independently. Resizing the panels preserves the expanded answers and reading position.
-4. **Export a paper.** Select a paper or one of its questions, click **Export answers**, and choose a `.txt` destination.
+1. **Open a paper.** The **All Papers** page shows your complete bank overview. Click a paper to list only its questions and open the first visible group. **All Papers** returns to the overview without rescanning and restores your global search.
+2. **Find a question.** Search IDs, text, answers, translations, or source paths. Search ignores case and requires all entered words. Global search filters the paper list while overview totals stay unchanged. Inside a paper, search is restricted to its groups. Matching shared material and additional references open automatically. Use the reading toolbar's arrows to visit highlighted matches within the current group; navigation reopens a matching section if you collapsed it. A metadata-only match is identified without a made-up content count.
+3. **Read the references.** Each question has a separate primary reference card. All choices use the same neutral style. **Show N more answers** reveals the remaining stored responses together, in source order. Each part expands independently; top and bottom controls collapse the card. Shared passages and group images start collapsed on each visit. Qn buttons scroll within the same document. Resizing, collapsing the sidebar, and changing themes retain the reading session.
+4. **Adjust the workspace.** Drag the sidebar divider or use its collapse button. A narrow window uses an icon rail automatically; use Expand when you need the list or search, and widening the window restores your manual preference. Choose **Settings → Appearance → System / Light / Dark**. The preference is saved locally; System follows Windows app appearance changes.
+5. **Export a paper.** Click **Export Paper** at the top right of a paper and choose a `.txt` destination. Success shows a brief toast; failures include the destination and actual error.
 
 **Export behavior:** the file includes the **entire selected paper**, including questions hidden by search, and **only the first stored answer per sub-question**. Questions without an answer retain `Answer not found`. Exports use UTF-8 with a BOM, save atomically, and protect original bank files from being overwritten.
 
-The details header shows the source path and **Folder modified** date. Hover over a paper or its date badge for the full folder path and local timestamp. Folder IDs serve as paper names when descriptive titles are absent.
+The reading header shows the paper, group, type and short date. Hover over the source metadata or date for the full local path and precise modification timestamp. Folder IDs serve as paper names when descriptive titles are absent. **Change Bank** remains at the bottom of the sidebar (a folder icon in the rail).
 
 ## Supported data
 
@@ -128,8 +130,8 @@ ETS/
 
 | What you see | What to do |
 | --- | --- |
-| **No exams found** | Choose a folder containing supported question records. You can open a bank root, one paper, or an individual `content_<id>` folder. |
-| **scan notes** | Click the status-bar link and expand the dialog details to see affected files and reasons. |
+| **No Exams Found** | Use the inline **Change Bank** button to choose supported question records. You can open a bank root, one paper, or an individual `content_<id>` folder. |
+| **scan notes / Scan failed** | Click **View details** in the status bar for a scrollable report containing real source paths and explanations. |
 | **Answer not found** | The source record has no usable stored answer. The viewer preserves that absence. |
 | **Image unavailable** | Check that the original asset exists in the question folder or its `material/` directory and is within the image limits. |
 | **Export failed** | Choose a writable destination. For normal use, launch the app from your own terminal; a development sandbox may restrict saving to other folders. Administrator rights are not required. |
@@ -165,4 +167,4 @@ $env:ETS_TEST_BANK = 'path\to\ETS'
 python -m unittest discover -v
 ```
 
-GUI integration tests use Qt's offscreen platform and real event loops. No additional test packages are required.
+GUI integration tests use Qt's offscreen platform and real event loops. Synthetic navigation, reading, appearance and startup tests run without a private bank. Private data tests keep their existing fixture checks and skip when that bank is absent. No additional test packages are required.
