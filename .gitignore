@@ -4,3 +4,9 @@ __pycache__/
 venv/
 ets-test-*/
 .test-artifacts/
+
+# Local development and planning files
+.superpower/
+.superpowers/
+docs/superpowers/
+docs/README-before-root-move.md
