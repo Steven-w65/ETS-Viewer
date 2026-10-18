@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">ETS-Viewer</title>
+  <desc id="description">A dark blue banner with the ETS-Viewer wordmark and an abstract illustration of organized papers, questions, and stored answers.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111B31"/>
+      <stop offset="1" stop-color="#0B1120"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(1020 80) rotate(150) scale(650 420)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#394A85" stop-opacity=".48"/>
+      <stop offset="1" stop-color="#394A85" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="64" y1="78" x2="132" y2="146" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A7BCFF"/>
+      <stop offset="1" stop-color="#7187E7"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="740" y1="42" x2="1134" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A2841"/>
+      <stop offset="1" stop-color="#111C30"/>
+    </linearGradient>
+    <clipPath id="clip"><rect width="1200" height="300" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect width="1200" height="300" fill="url(#background)"/>
+    <rect width="1200" height="300" fill="url(#glow)"/>
+    <path d="M632 0V300M728 0V300M824 0V300M920 0V300M1016 0V300M1112 0V300M600 54H1200M600 150H1200M600 246H1200" stroke="#B4C7FF" stroke-opacity=".035"/>
+    <circle cx="1054" cy="155" r="195" stroke="#9AAEFF" stroke-opacity=".09"/>
+    <circle cx="1054" cy="155" r="242" stroke="#9AAEFF" stroke-opacity=".045"/>
+    <rect x="64" y="65" width="58" height="58" rx="16" fill="url(#accent)"/>
+    <path d="M82 80H102V108H82V80Z" fill="#172342" fill-opacity=".13"/>
+    <path d="M84 80H102V108H84C81.8 108 80 106.2 80 104V84C80 81.8 81.8 80 84 80Z" stroke="#172342" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M86 89H96M86 95H96M86 101H92" stroke="#172342" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M64 147H108" stroke="#9FB5FF" stroke-width="3" stroke-linecap="round"/>
+    <text x="60" y="209" fill="#EDF2FF" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-2">ETS-Viewer</text>
+    <circle cx="67" cy="246" r="3" fill="#83C9AA"/>
+    <path d="M82 246H151M164 246H207M220 246H253" stroke="#526687" stroke-width="4" stroke-linecap="round"/>
+    <rect x="756" y="54" width="382" height="218" rx="16" fill="#070D19" fill-opacity=".35"/>
+    <rect x="746" y="40" width="382" height="218" rx="16" fill="url(#panel)" stroke="#405475"/>
+    <path d="M746 82H1128" stroke="#304460"/>
+    <circle cx="765" cy="61" r="3" fill="#62769A"/>
+    <circle cx="777" cy="61" r="3" fill="#62769A"/>
+    <circle cx="789" cy="61" r="3" fill="#62769A"/>
+    <rect x="819" y="52" width="289" height="18" rx="6" fill="#0F1A2D" stroke="#304460"/>
+    <circle cx="832" cy="60" r="3" stroke="#7E94BA" stroke-width="1.5"/>
+    <path d="M834.5 62.5L837 65M846 61H905" stroke="#657C9F" stroke-width="1.5" stroke-linecap="round"/>
+    <rect x="760" y="96" width="111" height="148" rx="9" fill="#101B2D"/>
+    <path d="M773 110H812" stroke="#7C91B4" stroke-width="3" stroke-linecap="round"/>
+    <path d="M775 129L778 132L775 135M786 132H851" stroke="#657DA1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="768" y="144" width="95" height="27" rx="6" fill="#2F456C" stroke="#6583B3"/>
+    <path d="M779 155H827M779 162H844" stroke="#C1D1EE" stroke-width="2" stroke-linecap="round"/>
+    <path d="M779 187H842M779 196H824M779 220H842M779 229H831" stroke="#516987" stroke-width="2" stroke-linecap="round"/>
+    <rect x="884" y="96" width="230" height="37" rx="8" fill="#1D2C44"/>
+    <path d="M897 109H983M897 120H1066" stroke="#A4B7D4" stroke-width="3" stroke-linecap="round"/>
+    <rect x="884" y="143" width="230" height="43" rx="8" fill="#172B44" stroke="#2B4465"/>
+    <path d="M897 156H1074M897 169H1044" stroke="#7E9EC2" stroke-width="2.5" stroke-linecap="round"/>
+    <rect x="884" y="196" width="230" height="48" rx="8" fill="#1B3B34" stroke="#3A6E5B"/>
+    <circle cx="901" cy="213" r="6" fill="#80C5A3" fill-opacity=".2"/>
+    <path d="M898 213L900 215L904 211" stroke="#9AD7B5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M916 213H1037M897 230H1083" stroke="#A1CEB8" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <rect x=".5" y=".5" width="1199" height="299" rx="23.5" stroke="#839DD0" stroke-opacity=".14"/>
+</svg>

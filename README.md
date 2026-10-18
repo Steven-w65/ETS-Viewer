@@ -1,247 +1,168 @@
-# ETS-Viewer
+<p align="center">
+  <img src="docs/assets/readme-banner.svg" alt="ETS-Viewer — a local question bank viewer" width="100%">
+</p>
 
-A small, entirely local desktop application for browsing ETS questions
-and their stored answers. It uses Python 3.11+ and PySide6; there are no other
-third-party dependencies, accounts, servers, or network requests.
+<p align="center">
+  <strong>Browse questions. Find stored answers. Stay offline.</strong><br>
+  A focused desktop viewer for your existing ETS question bank.
+</p>
 
-## Run
+<p align="center">
+  <samp>Python 3.11+ · PySide6 · Windows · Offline</samp>
+</p>
 
-From the repository root, with Python 3.11 or newer:
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#everyday-use">Usage</a> ·
+  <a href="#supported-data">Data formats</a> ·
+  <a href="#development">Development</a>
+</p>
+
+---
+
+ETS-Viewer turns a local ETS bank into a searchable collection of papers, questions, and reference answers. Open a folder, select a question, and read its original content alongside the answers already stored in the bank.
+
+> **Bring your own bank.** This repository includes the viewer only. Question-bank files and answer datasets are not bundled.
+
+## Quick start
+
+You need **Python 3.11 or newer** and a local bank in a [supported format](#supported-data). The commands below use Windows PowerShell.
+
+**1. Open a terminal in the project folder.** Download or clone the repository first.
+
+**2. Install the dependency and launch.**
 
 ```powershell
 python -m pip install -r requirements.txt
 python main.py
 ```
 
-For normal use, run this command from your own Windows terminal. A viewer
-started inside a development sandbox inherits that sandbox's write
-restrictions and may be unable to save to normal folders. Close that copy
-and launch it normally; administrator rights are not required.
+**3. Choose your bank.** The app opens `%APPDATA%\ETS` automatically when that folder exists. Otherwise, click **Select Folder**.
 
-On startup, the application automatically loads the current Windows user's
-`%APPDATA%\ETS` folder when it exists, normally
-`C:\Users\<user>\AppData\Roaming\ETS`. The username is never hard-coded.
-If `APPDATA` is unavailable, it resolves `AppData\Roaming\ETS` under the
-current user's home directory. If the folder is absent, use **Select Folder**
-to choose a bank manually. Passing a folder on the command line overrides
-the default.
-
-Click **Select Folder** to change banks, then expand an assignment
-or exam in the left panel using its arrow or by double-clicking the row.
-Select a question underneath it to view all its sub-questions and stored
-answers in the right panel. Assignments/exams start collapsed, so questions
-are not presented as one flat list.
-
-The groups follow the actual containing bank folders. In the supplied cache,
-these are `2674`, `392791`, `581015`, and `586944`. The cache does not store
-descriptive assignment/exam titles, so the original folder IDs are shown
-without inventing names. Selecting an individual bank or `content_<stid>`
-folder still retains the question's assignment/exam grouping.
-
-Each bank row shows its task folder's modification date as `YYYY-MM-DD`.
-Selecting a bank or one of its questions also shows **Folder modified** in the
-details header. Hover over the bank row or date badge for the complete folder
-path and timestamp in local time. Dates are read during the background scan;
-an unreadable timestamp displays **Date unavailable** and adds a scan note
-while its readable questions remain available.
-
-Type an assignment ID, question ID, or keywords to search. Searching is
-insensitive to case, supports Unicode, and matches all entered words across
-the original question, transcript, options, answers, and source path.
-Matching questions stay under their assignment/exam, and matching groups
-expand automatically. Clear the search to return to the collapsed groups.
-The bottom bar shows assignment/exam, question-group, and question counts.
-
-You can also open a folder directly:
+To open a different folder directly:
 
 ```powershell
-python main.py "D:\path\to\ETS"
+python main.py "path\to\ETS"
 ```
 
-The window has a dark theme, resizable panes, keyboard tree navigation, and
-scrollable question details. An invisible 8 px resize area separates the
-assignment panel from the question details. The resize cursor and live
-dragging remain available, with no visible bar on hover or while dragging.
-Question blocks use slate backgrounds,
-passages and translations use blue, answers use green, and original
-explanations or missing-answer notices use amber.
+Replace `path\to\ETS` with your bank's location. If `APPDATA` is unavailable, the default is `AppData\Roaming\ETS` inside the current user's home directory.
 
-Controls use 10 pt text, question/answer content uses 10.5 pt, question titles
-use 13 pt, and supporting text uses 9–9.5 pt. Repeated captions, navigation
-hints, and answer-count labels are omitted. Expanded references use compact
-numbering; multiple-choice answers show the stored answer without repeating
-the option text. Source paths remain in the details header.
+## Features
 
-Bank groups have distinct headings and compact counts; question previews,
-source paths, and status text use progressively quieter styling. Tree rows
-have one continuous rounded selection across their indentation and content,
-with a visible focus outline for keyboard navigation. The selection remains
-visible when focus moves to search or answers, and text selection uses the
-same colors throughout the interface.
+| | What you get |
+| --- | --- |
+| **Organized browsing** | Assignments and exams stay grouped by their source folders, with question previews and folder modification dates. |
+| **Flexible search** | Find papers or questions by ID, keywords, original text, transcripts, options, answers, or source path. Supports Chinese and other Unicode text. |
+| **Comfortable reading** | A dark interface, resizable panels, keyboard navigation, local prompt images, and clear question and answer blocks. |
+| **Reference answers** | See the first stored response immediately; expand additional references for each sub-question independently. |
+| **Paper exports** | Save a complete paper's questions and first stored answers as a Windows-friendly UTF-8 text file. |
+| **Local operation** | Browse without accounts, servers, or network requests. Scanning and viewing leave the original bank files unchanged. |
 
-For questions with multiple stored reference answers, the first answer is
-always visible. Click **Show all … answers** to expand the remaining original
-responses, or **Show fewer answers** to collapse them. Each sub-question has
-its own compact green button, with a directional chevron and distinct hover,
-pressed, and keyboard-focus states. List selections use a stronger blue fill;
-hovered rows use a quieter tint and outline. Resizing either pane preserves
-the expansion and reading position; selecting a different question starts
-with the first-answer preview.
+## Everyday use
 
-Select an assignment/exam or one of its questions to show **Export answers**
-in the details header. Click it and choose a `.txt` destination to export the
-entire selected paper, including questions hidden by the current search.
-The text includes question IDs, content, options, and dividing lines between
-questions and answers. Only the first stored answer for each sub-question is
-exported, even when more references are expanded on screen. Missing answers
-remain **Answer not found**; no answers are generated.
+1. **Open a paper.** Click **Select Folder**, then expand an assignment or exam in the left panel. Groups start collapsed; select a question to display its sub-questions and answers.
+2. **Find a question.** Type an ID or keywords in the search box. Search ignores case and matches all entered words. Matching groups expand automatically; clear the search to return to collapsed groups.
+3. **Read the references.** Use **Show all … answers** and **Show fewer answers** to expand or collapse stored responses. Resizing the panels preserves the expanded answers and reading position.
+4. **Export a paper.** Select a paper or one of its questions, click **Export answers**, and choose a `.txt` destination.
 
-The save dialog starts in the current user's `%APPDATA%\ETS` directory and
-suggests the task folder's name with Windows-invalid filename characters
-replaced. Files use UTF-8 with a BOM for Chinese text support in Windows
-editors. A message confirms a successful export or explains an I/O error.
-Saving is atomic, and original files inside the loaded bank cannot be
-overwritten; previously generated exports can be replaced.
+**Export behavior:** the file includes the **entire selected paper**, including questions hidden by search, and **only the first stored answer per sub-question**. Questions without an answer retain `Answer not found`. Exports use UTF-8 with a BOM, save atomically, and protect original bank files from being overwritten.
 
-Folder scanning and parsing run on a background
-thread; the GUI remains usable during loading. Selecting another folder
-cancels the previous scan. Closing during a scan requests interruption and
-waits for the worker to finish without blocking the GUI.
+The details header shows the source path and **Folder modified** date. Hover over a paper or its date badge for the full folder path and local timestamp. Folder IDs serve as paper names when descriptive titles are absent.
 
-## What was found in the supplied bank
+## Supported data
 
-Read-only inspection of `C:\Users\steve\AppData\Roaming\ETS` found 679 files
-(about 124 MB) across four local bank directories. The question stores are
-UTF-8 JSON in `<bank>/content_<stid>/`, with local assets under each
-question's `material/` directory. No SQLite or XML question store was found.
+The viewer recognizes these ETS collector schemas:
 
-The supplied bank contains **43 question groups / 108 questions and
-sub-questions**: 60 multiple-choice questions, 32 dialogue parts, four picture
-responses, eight word/sentence items, and four reading items. It contains 60
-explicit multiple-choice answers and 1,299 stored dialogue/picture reference
-responses. Twelve word/reading items have no stored answer and display exactly
-**Answer not found**. The application never treats reading text as an answer.
-
-| Observed format | Question content | Stored answers and mapping |
+| Schema | Displayed content | Answer source |
 | --- | --- | --- |
-| `collector.choose` | `info.st_nr` shared passage, `xtlist[].xt_nr` prompt, `xt_value` transcript or question text, `xxlist[].xx_mc/xx_nr` option label/text | `xtlist[].answer` belongs to the same `info.stid` and `xt_xh`; `xt_analy` is shown only when populated |
-| `collector.dialogue` | `info.value` passage and `question[].ask` prompt, identified by `xh` | The same part's explicit `answer`, `std[].value`, and `ref[].value`; every stored reference is retained |
-| `collector.picture` | `topic`, `value`, and the original local `image` | `std[].value` / `ref[].value`; original `keypoint` and `analyze` are shown separately |
-| `collector.word` | `value`, optional `translate` and `analyze` | No answer field exists in the inspected records |
-| `collector.read` | `value`, optional `translate` and `analyze` | No answer field exists in the inspected records |
+| `collector.choose` | Shared passages, prompts, transcripts, and labeled options | Explicit choice answers, supplemented by matching metadata when available |
+| `collector.dialogue` | Dialogue passages and individual prompts | Explicit answers and linked stored reference responses |
+| `collector.picture` | Topic, prompt, original local image, and available explanations | Stored reference responses |
+| `collector.word` | Word or sentence content, translations, and explanations | No answer field in the inspected records |
+| `collector.read` | Reading content, translations, and explanations | No answer field in the inspected records |
 
-`content.json` is preferred because it retains original explanation fields.
-`content2.json` is a display copy with substituted question numbers, and
-`info.json` is template metadata. These copies are not counted as additional
-questions. If the primary copy is missing or damaged, the scanner tries the
-display copy, then the observed multiple-choice metadata wrapper if available.
+**Answers come from the bank.** Missing answers display `Answer not found`. Prompts, reading passages, speech-evaluator fields, and scoring keywords are never used to invent answers.
 
-Multiple-choice metadata includes an explicit answer table. Its `stid` and
-`xth` are joined to `info.stid` and `xt_xh` to supplement missing answers;
-neither array order nor sub-question number alone establishes a relationship.
-The primary record's explicit answer takes precedence. Different source
-directories remain distinct even if they reuse the same IDs.
+<details>
+<summary><strong>Folder layout and record mapping</strong></summary>
 
-The leading `ets_thN` template markers are removed for display. Original
-question and reference text is otherwise retained, including any pre-existing
-replacement characters or errors in the local bank. The `ai` evaluator field
-and scoring `keywords` are never used to construct answers. Source paths are
-shown with every selected question.
+A typical bank contains paper folders with question records and local assets:
 
-For passage questions, `xt_nr` may contain only a template marker while
-`xt_value` contains the complete numbered question. That text is displayed
-as the question and used for the list preview. A genuinely absent answer is
-handled separately from a damaged or structurally incomplete record: damaged
-primary records produce a scan note and allow a complete alternate copy to
-load.
+```text
+ETS/
+└── <paper-id>/
+    └── content_<question-id>/
+        ├── content.json
+        ├── content2.json
+        ├── info.json
+        └── material/
+```
 
-## Limits and scan notes
+- `content.json` is preferred. If it is missing, damaged, or structurally incomplete, the scanner tries `content2.json` and then supported multiple-choice metadata in `info.json`.
+- Alternate copies in the same question folder are not counted as additional questions. Separate source folders stay distinct, even when their IDs match.
+- Choice metadata joins `stid` and `xth` to `info.stid` and `xt_xh`. An explicit answer in the primary record takes precedence.
+- Dialogue references come from the same part's `answer`, `std[].value`, and `ref[].value`; picture references come from `std[].value` and `ref[].value`.
+- Leading `ets_thN` markers are removed for display. Original question and reference text is otherwise retained.
+- Supported JSON records can also load under other filenames or extensions. Dictionaries, templates, and media assets are excluded from the question list.
 
-- Seven root `.txt` files contain standalone `[choice]` response caches without
-  question IDs. They are reported in **scan notes** and are not assigned to a
-  question by guess. The structured dialogue records already contain their
-  own explicitly linked reference responses.
-- Dictionaries, media, UI templates, and JavaScript example data in `common/`
-  are supporting application assets, not question records. They do not appear
-  in the question list.
-- The scanner checks data contents, so a supported collector JSON document
-  can also load under a different data filename/extension. It does not infer
-  arbitrary JSON schemas or execute JavaScript.
-- Unknown collector types, SQLite/XML schemas, archives, encrypted/proprietary
-  files, malformed data, and inaccessible files are reported. There is no
-  decryption or access-control bypass. Readable questions continue to load
-  when other files fail.
-- Source JSON files larger than 32 MiB are reported rather than parsed.
-  Symlink/junction directories are not followed. Local prompt images are
-  limited to the selected bank, 16 MiB per file and 40 million pixels.
-  Missing images show their original filename as unavailable; the viewer
-  never substitutes an unrelated image from `common/`.
-- This application displays question text, local prompt images, and stored
-  answers. Audio/video playback, recording, scoring, and study-management
-  functions are outside its scope.
+</details>
 
-Click **scan notes** in the status bar, then expand the dialog's details to
-see affected paths and reasons. When a completed scan finds no supported
-exams, scanning stops and a **No exams found** warning dialog shows the
-selected folder. Dismiss it with **OK**, then use **Select Folder** to choose
-another bank. Search results with no matches do not trigger this warning.
-Scanning and viewing never modify the original bank files or create cache
-or settings files there. Answer exports are written only to the destination
-chosen in the save dialog.
+<details>
+<summary><strong>Scope and file limits</strong></summary>
 
-## Project files
+- Unknown collector schemas, SQLite/XML stores, archives, encrypted data, and inaccessible files are reported in **scan notes**. Other readable questions can still load.
+- Standalone `[choice]` answer caches without question IDs are reported and left unassigned.
+- JSON files larger than **32 MiB** are not parsed. Symlink and junction directories are not followed.
+- Prompt images must stay inside the selected bank and are limited to **16 MiB** and **40 million pixels**. Source markup cannot load scripts or network resources.
+- The app covers question browsing, local images, stored answers, and text export. Audio/video playback, recording, scoring, and study management are outside its scope.
+- Scans run in the background. Opening another folder cancels the previous scan; closing the app requests a clean worker shutdown.
+
+</details>
+
+## Troubleshooting
+
+| What you see | What to do |
+| --- | --- |
+| **No exams found** | Choose a folder containing supported question records. You can open a bank root, one paper, or an individual `content_<id>` folder. |
+| **scan notes** | Click the status-bar link and expand the dialog details to see affected files and reasons. |
+| **Answer not found** | The source record has no usable stored answer. The viewer preserves that absence. |
+| **Image unavailable** | Check that the original asset exists in the question folder or its `material/` directory and is within the image limits. |
+| **Export failed** | Choose a writable destination. For normal use, launch the app from your own terminal; a development sandbox may restrict saving to other folders. Administrator rights are not required. |
+
+## Development
+
+The application uses Python's standard library and PySide6. Parsing, scanning, export, and UI rendering are separated:
 
 ```text
 ETS-Viewer/
-├── main.py
-├── requirements.txt
-├── core/
-│   ├── scanner.py
-│   ├── parser.py
-│   └── exporter.py
-├── ui/
-│   ├── main_window.py
-│   ├── renderer.py
-│   └── style.qss
-├── tests/
-└── README.md
+├── main.py              # Application entry point
+├── requirements.txt     # PySide6 dependency
+├── core/                # Parser, scanner, and answer export
+├── ui/                  # Window, safe rendering, and styles
+├── tests/               # Unit and integration tests
+├── docs/assets/         # README artwork
+├── README.md            # English
+└── README.zh-CN.md       # 简体中文
 ```
 
-The renderer is separate to keep source markup sanitization and local image
-loading out of the window's event-handling code. The GUI uses Qt's
-[QThread](https://doc.qt.io/qtforpython-6/PySide6/QtCore/QThread.html) and
-[QTextBrowser](https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QTextBrowser.html)
-without an embedded web engine.
-
-## Tests
+Run the suite from the project root:
 
 ```powershell
 python -m unittest discover -v
 ```
 
-Tests use real files in the inspected bank, with temporary copies inside the
-test directory for corruption and missing-data cases. No question-bank data
-or invented question/answer fixtures are distributed with the project. If
-your copy of this bank is elsewhere, set its path first:
+Data-backed tests expect the original reference bank used during development. They default to the current user's ETS folder and skip when the configured bank folder is absent. An arbitrary bank may not match the expected records. No question-bank data is distributed with the tests.
+
+To select the reference bank explicitly:
 
 ```powershell
-$env:ETS_TEST_BANK = 'D:\path\to\ETS'
+$env:ETS_TEST_BANK = 'path\to\ETS'
 python -m unittest discover -v
 ```
 
-The tests use the original three inspected bank directories for their stable
-36-group / 96-question baseline, and separately check the additional `2674`
-bank when available. Adding bank folders does not invalidate that baseline.
-They skip when the required bank is unavailable. GUI integration tests use Qt's offscreen
-platform and actual event loops to check background loading, folder
-replacement, closing during a scan, real answer rendering, Unicode search,
-local-resource isolation, collapsed assignment/exam grouping, nested question
-selection, searching within groups, panel spacing, live splitter dragging
-without rebuilding text, reference-answer controls, wheel scrolling through
-expanded answers without jumps, image rescaling,
-reading-position preservation on resize, continuous tree selection across
-focus changes, task-folder modification dates, current-user startup paths,
-command-line folder overrides, complete-paper TXT export under a search
-filter, first-answer-only output, Windows-safe filenames, Unicode files,
-save cancellation, I/O error messages, and protection of original bank files.
-They require no additional test packages.
+GUI integration tests use Qt's offscreen platform and real event loops. No additional test packages are required.

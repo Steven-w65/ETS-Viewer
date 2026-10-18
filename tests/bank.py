@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import tempfile
 
-BANK = Path(os.environ.get("ETS_TEST_BANK", r"C:\Users\steve\AppData\Roaming\ETS"))
+_roaming = os.environ.get("APPDATA")
+_default_bank = (Path(_roaming) if _roaming else Path.home() / "AppData" / "Roaming") / "ETS"
+BANK = Path(os.environ.get("ETS_TEST_BANK", _default_bank))
 
 
 def read_record(relative):
