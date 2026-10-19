@@ -209,6 +209,7 @@ class MainWindow(QMainWindow):
         self.question_tree.setAccessibleName("Papers")
         self.question_tree.setModel(self.proxy)
         self.question_tree.selectionModel().currentChanged.connect(self._show_current)
+        self.question_tree.clicked.connect(self._show_current)
         layout.addWidget(self.question_tree, 1)
         self.sidebar_empty = QWidget()
         empty_layout = QVBoxLayout(self.sidebar_empty)
@@ -685,7 +686,10 @@ class MainWindow(QMainWindow):
         question = index.data(Qt.ItemDataRole.UserRole)
         if question is None:
             assignment = index.data(ASSIGNMENT_ROLE)
-            if assignment is not None:
+            # currentChanged fires before Qt finishes mouse selection. Changing
+            # roots there can select a question at the old paper's coordinates.
+            # Enter on clicked instead; keyboard/programmatic entry is immediate.
+            if assignment is not None and QApplication.mouseButtons() == Qt.MouseButton.NoButton:
                 self._enter_paper(assignment)
             return
         if self._current_paper is None:

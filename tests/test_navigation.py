@@ -112,6 +112,38 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(window.back_button.isVisible())
         self.assertTrue(window.export_button.isVisible())
 
+    def test_clicking_a_paper_highlights_the_same_question_as_the_reader(self):
+        window = self.window
+        # Put the multi-question paper second. Its click position falls over
+        # question 2 after entering, exposing a root change during mousePress.
+        dates = dict(window._result.folder_modified)
+        dates[self.root / "Paper Beta"] = datetime(2026, 1, 1)
+        window._accept_result(replace(window._result, folder_modified=dates))
+        self.app.processEvents()
+        tree = window.question_tree
+        paper = window.proxy.index(1, 0)
+        QTest.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                         pos=tree.visualRect(paper).center())
+        self.app.processEvents()
+        highlighted = tree.selectionModel().selectedRows()
+        self.assertEqual([index.data(Qt.ItemDataRole.UserRole).id for index in highlighted], ["a1"])
+        self.assertIs(highlighted[0].data(Qt.ItemDataRole.UserRole), window.browser._question)
+        self.assertEqual(tree.currentIndex(), highlighted[0])
+        self.assertIn("Describe the forest", window.browser.toPlainText())
+        self.assertIn("First reference about trees", window.browser.toPlainText())
+        self.assertNotIn("Choose the river", window.browser.toPlainText())
+
+    def test_keyboard_paper_entry_keeps_selection_and_reader_together(self):
+        tree = self.window.question_tree
+        tree.setFocus()
+        QTest.keyClick(tree, Qt.Key.Key_Down)
+        self.app.processEvents()
+        self.assertEqual(self.window.navigation_level, "questions")
+        highlighted = tree.selectionModel().selectedRows()
+        self.assertEqual(len(highlighted), 1)
+        self.assertIs(highlighted[0].data(Qt.ItemDataRole.UserRole), self.window.browser._question)
+        self.assertIn("Describe the forest", self.window.browser.toPlainText())
+
     def test_global_search_leaves_overview_unchanged_and_back_restores_query(self):
         self.query("sapphire 中文")
         self.assertEqual(self.window.proxy.rowCount(), 1)
