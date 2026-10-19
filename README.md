@@ -31,6 +31,12 @@ ETS-Viewer turns a local ETS bank into a searchable collection of papers, questi
 
 ## Quick start
 
+**Portable Windows build:** Download [ETS-Viewer-windows-x64.zip](https://github.com/Steven-w65/ETS-Viewer/releases/latest/download/ETS-Viewer-windows-x64.zip) from [Releases](https://github.com/Steven-w65/ETS-Viewer/releases), extract the complete archive, and open **ETS-Viewer.exe**. Keep its `_internal` folder beside the executable. Python installation and administrator access are not required. Bring your own question bank.
+
+The release also includes a `.zip.sha256` checksum file. Compare it with `Get-FileHash .\ETS-Viewer-windows-x64.zip -Algorithm SHA256` before extracting.
+
+**Run from source:**
+
 You need **Python 3.11 or newer** and a local bank in a [supported format](#supported-data). The commands below use Windows PowerShell.
 
 **1. Open a terminal in the project folder.** Download or clone the repository first.
@@ -168,3 +174,23 @@ python -m unittest discover -v
 ```
 
 GUI integration tests use Qt's offscreen platform and real event loops. Synthetic navigation, reading, appearance and startup tests run without a private bank. Private data tests keep their existing fixture checks and skip when that bank is absent. No additional test packages are required.
+
+### Automatic regression checks
+
+The [Regression checks workflow](https://github.com/Steven-w65/ETS-Viewer/actions/workflows/regression.yml) runs on pushes and pull requests. Windows jobs cover Python 3.11 with Qt 6.8, current Python 3.14 with the supported Qt range, and 125%/150% display scaling. Synthetic parser, scanner, export, security, and UI fixtures run without a private bank; data-backed tests skip when their original bank is unavailable. Each job preserves its test log.
+
+### Build a portable Windows release
+
+Use 64-bit Python on Windows. Build dependencies are separate from the viewer's runtime requirements:
+
+```powershell
+python -m pip install -r requirements-build.txt
+python tools/build_portable.py
+python tools/smoke_portable.py dist/ETS-Viewer-windows-x64.zip
+```
+
+The build creates `dist/ETS-Viewer-windows-x64.zip` and its SHA-256 file. It bundles the Python/Qt runtime, image plugins, theme template, and supplied dependency license metadata. Question-bank files and tests are not included. `BUILD-INFO.txt` identifies the source commit and bundled versions.
+
+The smoke test extracts the ZIP to a path containing spaces and Unicode, starts the packaged app with a synthetic bank and Python removed from `PATH`, checks its native window, and requests a clean shutdown.
+
+The [Portable Windows release workflow](https://github.com/Steven-w65/ETS-Viewer/actions/workflows/portable-windows.yml) can be run manually to download a tested build artifact. Pushing a new `vMAJOR.MINOR.PATCH` tag runs the regression checks, builds and smoke-tests the ZIP, then publishes the ZIP and checksum to GitHub Releases.

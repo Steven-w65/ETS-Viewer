@@ -31,6 +31,12 @@ ETS-Viewer 将本地 ETS 题库整理为可搜索的试卷、题目和参考答�
 
 ## 快速开始
 
+**Windows 便携版：** 从 [Releases](https://github.com/Steven-w65/ETS-Viewer/releases) 下载 [ETS-Viewer-windows-x64.zip](https://github.com/Steven-w65/ETS-Viewer/releases/latest/download/ETS-Viewer-windows-x64.zip)，完整解压后打开 **ETS-Viewer.exe**。请保留可执行文件旁的 `_internal` 文件夹，无需安装 Python 或使用管理员权限。题库需要自行准备。
+
+发布页面同时提供 `.zip.sha256` 校验文件。解压前可运行 `Get-FileHash .\ETS-Viewer-windows-x64.zip -Algorithm SHA256`，与文件中的 SHA-256 值核对。
+
+**从源码运行：**
+
 需要 **Python 3.11 或更新版本**，以及一份[格式受支持](#支持的数据格式)的本地题库。以下命令适用于 Windows PowerShell。
 
 **1. 在项目文件夹中打开终端。** 请先下载或克隆本仓库。
@@ -170,3 +176,23 @@ python -m unittest discover -v
 ```
 
 界面集成测试使用 Qt 离屏平台和真实事件循环。导航、阅读、主题和启动的合成数据测试无需私有题库；依赖原始题库的测试仍保留数据检查，并在题库缺失时跳过。无需安装额外测试包。
+
+### 自动回归检查
+
+[Regression checks 工作流](https://github.com/Steven-w65/ETS-Viewer/actions/workflows/regression.yml) 在推送和拉取请求时自动运行。Windows 检查覆盖 Python 3.11 与 Qt 6.8、Python 3.14 与受支持的 Qt 版本，以及 125%/150% 显示缩放。解析、扫描、导出、安全和界面测试使用合成数据，不需要私有题库；依赖原始题库的测试会在数据缺失时跳过。各任务保留测试日志。
+
+### 构建 Windows 便携版
+
+在 Windows 上使用 64 位 Python。构建依赖与查看器的运行依赖分开管理：
+
+```powershell
+python -m pip install -r requirements-build.txt
+python tools/build_portable.py
+python tools/smoke_portable.py dist/ETS-Viewer-windows-x64.zip
+```
+
+构建结果为 `dist/ETS-Viewer-windows-x64.zip` 及对应的 SHA-256 校验文件，包含 Python/Qt 运行环境、图片插件、主题模板及依赖自带的许可证元数据，不包含题库或测试文件。`BUILD-INFO.txt` 记录源码提交和打包版本。
+
+冒烟测试会将 ZIP 解压到含空格及 Unicode 字符的路径，移除 `PATH` 中的 Python，以合成题库启动打包程序，检查原生窗口并请求正常退出。
+
+[Portable Windows release 工作流](https://github.com/Steven-w65/ETS-Viewer/actions/workflows/portable-windows.yml) 支持手动运行并下载经过测试的构建产物。推送新的 `vMAJOR.MINOR.PATCH` 标签后，工作流会运行回归检查、构建并验证便携版，然后将 ZIP 和校验文件发布到 GitHub Releases。

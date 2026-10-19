@@ -4,6 +4,8 @@ __pycache__/
 venv/
 ets-test-*/
 .test-artifacts/
+build/
+dist/
 
 # Local development and planning files
 .superpower/

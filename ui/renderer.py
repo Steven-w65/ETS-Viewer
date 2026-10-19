@@ -72,7 +72,10 @@ def _image_html(reference: str, source: Path, root: Path, width: int) -> str:
     if path:
         reader = QImageReader(str(path))
         size = reader.size()
-        if size.isValid() and size.width() * size.height() <= 40_000_000:
+        # A valid header can still have truncated/corrupt pixel data. Decode
+        # only after the existing limits pass, before emitting an image tag.
+        if (size.isValid() and size.width() * size.height() <= 40_000_000
+                and not reader.read().isNull()):
             display_width = min(max(width, 1), size.width())
             height = max(1, round(size.height() * display_width / size.width()))
             return (f'<p><img src="{escape(path.as_uri(), quote=True)}" '

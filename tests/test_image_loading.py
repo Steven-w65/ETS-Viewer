@@ -177,6 +177,36 @@ class ImageLoadingTests(unittest.TestCase):
         for name in ("invalid.png", "invalid.jpg", "unsupported.svg"):
             self.assertIn(f"Image unavailable: {name}", self.browser.toPlainText())
 
+    def test_valid_headers_with_corrupt_pixel_data_use_the_existing_fallback(self):
+        names = ("truncated.png", "corrupt.jpg")
+        for name in names:
+            path = self.save_image(self.source.parent / name, size=(1200, 800))
+            data = bytearray(path.read_bytes())
+            if path.suffix == ".png":
+                data = data[:200]
+            else:
+                # Keep JPEG dimensions readable, but invalidate a DC Huffman
+                # symbol so the pixel decoder cannot produce an image.
+                marker = data.index(b"\xff\xc4")
+                data[marker + 5 + 16] = 255
+            path.write_bytes(data)
+            reader = QImageReader(str(path))
+            size, decoded = reader.size(), reader.read()
+            del reader  # Release Qt's file handle before temporary cleanup.
+            self.assertEqual(size, QSize(1200, 800))
+            self.assertTrue(decoded.isNull(), name)
+        self.show_references(names)
+        self.assertFalse(self.image_formats())
+        for name in names:
+            self.assertIn(f"Image unavailable: {name}", self.browser.toPlainText())
+        for colors, width in ((DARK_COLORS, 400), (LIGHT_COLORS, 1000)):
+            self.browser.resize(width, 650)
+            self.browser.set_theme(colors)
+            self.app.processEvents()
+            self.assertFalse(self.image_formats())
+            for name in names:
+                self.assertIn(f"Image unavailable: {name}", self.browser.toPlainText())
+
     def test_remote_network_and_outside_root_images_stay_blocked(self):
         outside = self.save_image(Path(self.directory) / "outside.png")
         references = ("https://example.invalid/image.jpg", "http://example.invalid/image.png",
